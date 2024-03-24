@@ -1,7 +1,9 @@
 use clap::{Parser, Subcommand};
-use configuration::{Configuration, Player};
+use configuration::{Configuration, Player, Port};
+use plex_client::PlexClient;
 
 mod configuration;
+mod plex_client;
 
 /// Controls Plexamp Media Playback
 #[derive(Parser)]
@@ -38,7 +40,7 @@ enum ConfigCommand {
         // Hostname of the player
         host: String,
         // Port of the player
-        port: i16,
+        port: Port,
     },
     /// Deletes a configured player target
     Delete {
@@ -61,20 +63,21 @@ enum PlaybackCommands {
     Stop,
     Next,
     Previous,
+    Forward,
+    Backward,
 }
 
 fn main() {
+    env_logger::init();
     let args = Cli::parse();
     let mut config: Configuration = Configuration::load();
 
     match args.command {
-        Some(Commands::Playback { player, command }) => match command {
-            PlaybackCommands::Play => println!("Play: {:?}", player),
-            PlaybackCommands::Pause => println!("Pause: {:?}", player),
-            PlaybackCommands::Stop => println!("Stop: {:?}", player),
-            PlaybackCommands::Next => println!("Next: {:?}", player),
-            PlaybackCommands::Previous => println!("Previous: {:?}", player),
-        },
+        Some(Commands::Playback { player, command }) => {
+            let player_struct = config.get_player(&player).expect("Invalid player");
+
+            run_playback_command(command, player_struct)
+        }
         Some(Commands::Config { command }) => match command {
             ConfigCommand::Add { name, host, port } => {
                 config.add_player(name, host, port).store();
@@ -84,7 +87,7 @@ fn main() {
             }
             ConfigCommand::List => {
                 println!("Configured players:");
-                for (name, Player { host, port }) in config.players.iter() {
+                for (name, Player { host, port, .. }) in config.players.iter() {
                     if config.is_default(name) {
                         println!("\t{name} -> {host}:{port} [DEFAULT]");
                     } else {
@@ -103,5 +106,20 @@ fn main() {
         None => {
             println!("No command provided");
         }
+    }
+}
+
+fn run_playback_command(command: PlaybackCommands, player: &Player) {
+    let client = PlexClient {
+        player: player.clone(),
+    };
+    match command {
+        PlaybackCommands::Play => client.play(),
+        PlaybackCommands::Pause => client.pause(),
+        PlaybackCommands::Stop => client.stop(),
+        PlaybackCommands::Next => client.next(),
+        PlaybackCommands::Previous => client.previous(),
+        PlaybackCommands::Forward => client.forward(),
+        PlaybackCommands::Backward => client.backward(),
     }
 }

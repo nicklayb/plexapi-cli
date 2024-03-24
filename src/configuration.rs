@@ -4,10 +4,11 @@ use std::collections::HashMap;
 const CONFIG_NAMESPACE: &str = "plexamp-cli";
 const CONFIG_FILE: &str = "config";
 
-type Port = i16;
+pub type Port = i32;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Player {
+    pub name: String,
     pub host: String,
     pub port: Port,
 }
@@ -32,15 +33,24 @@ impl Configuration {
         self.players.contains_key(name) == true
     }
 
+    pub fn get_player(&self, name: &String) -> Option<&Player> {
+        if name == "default" {
+            self.players.get(&self.default_player)
+        } else {
+            self.players.get(name)
+        }
+    }
+
     fn has_players(&self) -> bool {
         self.players.is_empty()
     }
 
-    pub fn add_player(&mut self, name: String, host: String, port: i16) -> &Configuration {
+    pub fn add_player(&mut self, name: String, host: String, port: Port) -> &Configuration {
         if !self.has_players() {
             self.default_player = name.clone()
         }
-        self.players.insert(name, Player { host, port });
+        self.players
+            .insert(name.clone(), Player { name, host, port });
         self
     }
 
